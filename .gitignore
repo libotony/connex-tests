@@ -5,5 +5,3 @@ package/
 *.tgz
 .DS_Store
 .vscode
-coverage
-.nyc_output
