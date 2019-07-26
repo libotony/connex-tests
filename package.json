@@ -1,0 +1,30 @@
+{
+    "name": "connex-tests",
+    "version": "1.0.0",
+    "description": "connex test suites powered by mocha and chai",
+    "main": "dist/",
+    "scripts": {
+        "build": "tsc -p .",
+        "postinstall": "npm run build",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "connex",
+        "test",
+        "mocha"
+    ],
+    "author": "tony.li",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/chai": "^4.1.7",
+        "@types/mocha": "^5.2.7",
+        "@vechain/connex": "^1.3.1",
+        "@types/node": "^12.6.8",
+        "ts-node": "^8.3.0",
+        "typescript": "^3.5.3"
+    },
+    "dependencies": {
+        "chai": "^4.2.0",
+        "thor-devkit": "^0.11.0"
+    }
+}
