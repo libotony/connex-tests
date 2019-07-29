@@ -3,7 +3,6 @@ const { ensureBlock, ensureStatus, ensureTransaction, ensureTransactionReceipt, 
 const { expect } = require('chai')
 const { isSemVer, isHexBytes, isAddress, isBytes32 } = require('./types')
 const { promiseWrapper } = require('./utils')
-const { Certificate } = require('thor-devkit')
 
 const transferEventABI = { "anonymous": false, "inputs": [{ "indexed": true, "name": "_from", "type": "address" }, { "indexed": true, "name": "_to", "type": "address" }, { "indexed": false, "name": "_value", "type": "uint256" }], "name": "Transfer", "type": "event" }
 const candidateEventABI = { "anonymous": false, "inputs": [{ "indexed": true, "name": "nodeMaster", "type": "address" }, { "indexed": false, "name": "action", "type": "bytes32" }], "name": "Candidate", "type": "event" }
@@ -71,7 +70,21 @@ describe('connex.thor', () => {
     describe('connex.thor.ticker', () => {
 
         it('connex.thor.ticker should be resolved without error thrown', done => {
-            connex.thor.ticker().next().then(() => {
+            const ticker = connex.thor.ticker()
+            ticker.next().then(() => {
+                done()
+            }).catch(e => {
+                done(e)
+            })
+        })
+
+        it('connex.thor.ticker should resolve ', done => {
+            const ticker = connex.thor.ticker()
+            new Promise((resolve) => {
+                setTimeout(resolve, 15*1000)
+            }).then(() => {
+                return ticker.next()
+            }).then(() => {
                 done()
             }).catch(e => {
                 done(e)
@@ -103,6 +116,11 @@ describe('connex.thor', () => {
             }), done)
         })
 
+        it('ensure account\'s revision', () => {
+            const a = connex.thor.account('0x0000000000000000000000000000456e65726779')
+            expect(a.address).to.be.equal('0x0000000000000000000000000000456e65726779')
+        })
+
         describe('connex.thor.account(...).method', () => {
 
             it('call name method should return name', (done) => {
@@ -117,6 +135,7 @@ describe('connex.thor', () => {
             it('call contract method set low gas should revert and gasUsed should be the setted gas', (done) => {
                 const nameMethod = connex.thor.account('0x0000000000000000000000000000456e65726779').method(nameABI)
                 nameMethod.gas(1)
+                nameMethod.gasPrice('1000000000000000')
                 promiseWrapper(nameMethod.call().then(output => {
                     ensureVMOutput(output)
                     expect(output.gasUsed).to.be.equal(1)
@@ -143,6 +162,14 @@ describe('connex.thor', () => {
                     done()
                 }), done)
             })
+
+            it("add master by executor should not revert", (done) => {
+                const addMasterMethod = connex.thor.account('0x0000000000000000000000417574686f72697479').method(addMasterABI).caller('0xB5A34b62b63A6f1EE99DFD30b133B657859f8d79')
+                promiseWrapper(addMasterMethod.call('0x0000000000000000000000417574686f72697479', '0x0000000000000000000000417574686f72697479', '0x0000000000000000000000000000000000000000000000417574686f72697479').then(output => {
+                    expect(output).to.have.property('reverted', false)
+                    done()
+                }), done)
+            })
         })
 
         describe('connex.thor.account(...).event', () => { 
@@ -156,6 +183,19 @@ describe('connex.thor', () => {
                 expect(criteria).to.have.property('address', '0x0000000000000000000000000000456e65726779')
                 expect(criteria).to.have.property('topic0', '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef')
                 expect(criteria).to.have.property('topic2', '0x000000000000000000000000d3ae78222beadb038203be21ed5ce7c9b1bff602')
+            })
+
+            it('filter should accept criteria and range', (done) => {
+                const transferEvent = connex.thor.account('0x0000000000000000000000000000456e65726779').event(transferEventABI)
+                const criteria = transferEvent.asCriteria({
+                    _to: '0xd3ae78222beadb038203be21ed5ce7c9b1bff602'
+                })
+                const filter = transferEvent.filter([]).criteria([criteria]).range({ unit: 'block', from: 0, to: 0 })
+                // ensure block 0 to block 1 does not contain energy transfer event
+                promiseWrapper(filter.apply(0, 1).then(logs => {
+                    expect(logs.length).to.be.equal(0)
+                    done()
+                }),done)
             })
 
             it('filter should return the candidate event log', (done) => {
@@ -188,6 +228,15 @@ describe('connex.thor', () => {
             }), done)
         })
 
+        it('ensure block visitor\'s revision', () => {
+            const b = connex.thor.block(1)
+            expect(b.revision).to.be.equal(1)
+        })
+
+        it('block without revision should give the revision of head block id', () => {
+            expect(connex.thor.block().revision).to.be.equal(connex.thor.status.head.id)
+        })
+
         it('getBlock should accept block ID as parameter', done => {
             promiseWrapper(connex.thor.block(connex.thor.genesis.id).get().then(blk => {
                 ensureBlock(blk)
@@ -211,6 +260,12 @@ describe('connex.thor', () => {
                 ensureTransaction(tx)
                 done()
             }), done)
+        })
+
+        it('ensure transaction visitor\'s revision', () => {
+            const txid = '0x9daa5b584a98976dfca3d70348b44ba5332f966e187ba84510efb810a0f9f851'
+            const t = connex.thor.transaction(txid)
+            expect(t.id).to.be.equal(txid)
         })
 
         it('getTransaction invalid block ID should return null', done => {
@@ -262,6 +317,7 @@ describe('connex.thor', () => {
             const explainer = connex.thor.explain()
             explainer
                 .gas(200000)
+                .gasPrice('1000000000000000')
                 .caller('0xe59d475abe695c7f67a8a2321f33a856b0b4c71d')
             
             promiseWrapper(explainer.execute([
@@ -280,109 +336,25 @@ describe('connex.thor', () => {
             }), done)
         })
 
-    })
+        it('explain should decode revert reason if there is reverted clause', (done) => {
+            const addMasterMethod = connex.thor.account('0x0000000000000000000000417574686f72697479').method(addMasterABI)
 
-})
+            const explainer = connex.thor.explain()
+            explainer
+                .gas(200000)
 
-describe('connex.vendor', () => {
+            promiseWrapper(explainer.execute([
+                addMasterMethod.asClause('0x0000000000000000000000417574686f72697479', '0x0000000000000000000000417574686f72697479', '0x0000000000000000000000000000000000000000000000417574686f72697479')
+            ]).then(outputs => {
+                const VMOut = outputs[0]
 
-    it('should own 0xf2e7617c45c42967fde0514b5aa6bba56e3e11dd in user account', () => {
-        expect(connex.vendor.owned('0xf2e7617c45c42967fde0514b5aa6bba56e3e11dd')).to.be.true
-    })
+                expect(VMOut).to.have.property('reverted', true)
+                expect(VMOut).to.have.property('decoded')
+                expect(VMOut.decoded).to.have.property('revertReason', 'builtin: executor required')
+                done()
+            }), done)
+        })
 
-    it('should not own 0x0000000000000000000000000000000000000000 in user account', () => {
-        expect(connex.vendor.owned('0x0000000000000000000000000000000000000000')).to.be.false
-    })
-
-    it('acquire singing service should return signing service without error', () => {
-        let txSigner = connex.vendor.sign('tx')
-        expect(txSigner).to.not.equal(undefined)
-        let certSigner = connex.vendor.sign('cert')
-        expect(certSigner).to.not.equal(undefined)
-    })
-
-    it('tx signing should return txid and signer', (done) => {
-        let txSigner = connex.vendor.sign('tx')
-        promiseWrapper(txSigner.request([{
-            to: '0x7567d83b7b8d80addcb281a71d54fc7b3364ffed',
-            value: '10000000000000000',
-            data: '0x',
-        }]).then(ret => { 
-            expect(isAddress(ret.signer), 'signer should be an address').to.be.true
-            expect(isBytes32(ret.txid), 'txid should be an bytes32').to.be.true
-            done()
-        }), done)
-    })
-
-    it('specify signer should signed by the signer', (done) => {
-        let txSigner = connex.vendor.sign('tx')
-        txSigner.signer('0xf2e7617c45c42967fde0514b5aa6bba56e3e11dd')
-        promiseWrapper(txSigner.request([{
-            to: '0x7567d83b7b8d80addcb281a71d54fc7b3364ffed',
-            value: '10000000000000000',
-            data: '0x',
-        }]).then(ret => {
-            expect(ret.signer).to.be.equal('0xf2e7617c45c42967fde0514b5aa6bba56e3e11dd')
-            done()
-        }), done)
-    })
-
-    it('identification cert signing should return valid cert response', (done) => {
-        let certSigner = connex.vendor.sign('cert')
-        promiseWrapper(certSigner.request({
-            purpose: 'identification',
-            payload: {
-                type: 'text',
-                content: 'random generated string'
-            }
-        }).then(ret => {
-            expect(isHexBytes(ret.signature), 'signature be a hex format string').to.be.true
-            expect(ret.annex.domain).to.be.equal(location.hostname)
-            expect((connex.thor.status.head.timestamp - ret.annex.timestamp)%10)
-            expect(ret.annex.timestamp).to.be.below((new Date().getTime()) / 1000).to.be.above((new Date().getTime()) / 1000-60)
-            expect(isAddress(ret.annex.signer), 'signer should be an address').to.be.true
-            Certificate.verify({
-                purpose: 'identification',
-                payload: {
-                    type: 'text',
-                    content: 'random generated string'
-                },
-                domain: ret.annex.domain,
-                timestamp: ret.annex.timestamp,
-                signer: ret.annex.signer,
-                signature: ret.signature
-            })
-            done()
-        }), done)
-    })
-
-    it('agreement cert signing should return valid cert response', (done) => {
-        let certSigner = connex.vendor.sign('cert')
-        promiseWrapper(certSigner.request({
-            purpose: 'agreement',
-            payload: {
-                type: 'text',
-                content: 'agreement'
-            }
-        }).then(ret => {
-            expect(isHexBytes(ret.signature), 'signature be a hex format string').to.be.true
-            expect(ret.annex.domain).to.be.equal(location.hostname)
-            expect((connex.thor.status.head.timestamp - ret.annex.timestamp) % 10)
-            expect(ret.annex.timestamp).to.be.below((new Date().getTime()) / 1000).to.be.above((new Date().getTime()) / 1000 - 60)
-            expect(isAddress(ret.annex.signer), 'signer should be an address').to.be.true
-            Certificate.verify({
-                purpose: 'agreement',
-                payload: {
-                    type: 'text',
-                    content: 'agreement'
-                },
-                domain: ret.annex.domain,
-                timestamp: ret.annex.timestamp,
-                signer: ret.annex.signer,
-                signature: ret.signature
-            })
-            done()
-        }), done)
     })
 
 })

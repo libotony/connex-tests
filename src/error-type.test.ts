@@ -1,5 +1,6 @@
 // tslint:disable:max-line-length
 const { expect } = require('chai')
+const { promiseWrapper } = require('./utils')
 
 const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined'
 const transferEventABI = { anonymous: false, inputs: [{ indexed: true, name: '_from', type: 'address' }, { indexed: true, name: '_to', type: 'address' }, { indexed: false, name: '_value', type: 'uint256' }], name: 'Transfer', type: 'event' }
@@ -13,6 +14,16 @@ describe('error type and message', () => {
         it('account: invalid address should throw', done => {
             try {
                 connex.thor.account('invalid address')
+                done(new Error('Should throw error'))
+            } catch (err) {
+                expect(err.name).to.be.equal('BadParameter')
+                done()
+            }
+        })
+
+        it('account: invalid abi should throw', done => {
+            try {
+                connex.thor.account('0x0000000000000000000000000000456e65726779').method({ wrong: 'invalid abi' })
                 done(new Error('Should throw error'))
             } catch (err) {
                 expect(err.name).to.be.equal('BadParameter')
@@ -565,10 +576,52 @@ describe('error type and message', () => {
             }
         })
 
-        it('cert-request:invalid signer should throw', done => {
-            const txSigner = connex.vendor.sign('cert')
+        it('tx-request: enforce non-owned address should reject', done => {
+            const txSigner = connex.vendor.sign('tx')
+            txSigner
+                .signer('0x0000000000000000000000000000000000000000')
+            promiseWrapper(
+                txSigner.request([]).then(() => {
+                    return done(new Error('Should throw error'))
+                }).catch((err)=>{
+                    expect(err.name).to.be.equal('Rejected')
+                    done()
+                })
+            , done)
+        })
+
+        it('tx-request: set non-function to delegate handler should throw', done => {
+            const txSigner = connex.vendor.sign('tx')
             try {
-                txSigner.signer('invalid address')
+                txSigner.delegate(null as any)
+                done(new Error('Should throw error'))
+            } catch (err) {
+                expect(err.name).to.be.equal('BadParameter')
+                done()
+            }
+        })
+
+        it('tx-request: delegate handler return non-65 length string should throw', done => {
+            const txSigner = connex.vendor.sign('tx')
+            txSigner.delegate(() => {
+                return Promise.resolve({ signature: '' })
+            })
+
+            promiseWrapper(
+                txSigner.request([]).then(() => {
+                    return done(new Error('Should throw error'))
+                }).catch((err) => {
+                    expect(err.name).to.be.equal('Rejected')
+                    done()
+                })
+            , done)
+            
+        })
+
+        it('cert-request:invalid signer should throw', done => {
+            const certSigner = connex.vendor.sign('cert')
+            try {
+                certSigner.signer('invalid address')
                 done(new Error('Should throw error'))
             } catch (err) {
                 expect(err.name).to.be.equal('BadParameter')
@@ -577,9 +630,9 @@ describe('error type and message', () => {
         })
 
         it('cert-request:invalid message should throw', done => {
-            const txSigner = connex.vendor.sign('cert')
+            const certSigner = connex.vendor.sign('cert')
             try {
-                txSigner.request(0 as any)
+                certSigner.request(0 as any)
                 done(new Error('Should throw error'))
             } catch (err) {
                 expect(err.name).to.be.equal('BadParameter')
@@ -588,9 +641,9 @@ describe('error type and message', () => {
         })
 
         it('cert-request:invalid purpose should throw', done => {
-            const txSigner = connex.vendor.sign('cert')
+            const certSigner = connex.vendor.sign('cert')
             try {
-                txSigner.request({
+                certSigner.request({
                     purpose: 'invalid'
                 } as any)
                 done(new Error('Should throw error'))
@@ -601,9 +654,9 @@ describe('error type and message', () => {
         })
 
         it('cert-request:invalid payload.type should throw', done => {
-            const txSigner = connex.vendor.sign('cert')
+            const certSigner = connex.vendor.sign('cert')
             try {
-                txSigner.request({
+                certSigner.request({
                     purpose: 'identification',
                     payload: {
                         type: 'invalid'
@@ -617,9 +670,9 @@ describe('error type and message', () => {
         })
 
         it('cert-request:invalid payload.content should throw', done => {
-            const txSigner = connex.vendor.sign('cert')
+            const certSigner = connex.vendor.sign('cert')
             try {
-                txSigner.request({
+                certSigner.request({
                     purpose: 'identification',
                     payload: {
                         type: 'text',
@@ -631,6 +684,25 @@ describe('error type and message', () => {
                 expect(err.name).to.be.equal('BadParameter')
                 done()
             }
+        })
+
+        it('cert-request: enforce non-owned address should reject', done => {
+
+            const certSigner = connex.vendor.sign('cert')
+            certSigner
+                .signer('0x0000000000000000000000000000000000000000')
+            promiseWrapper(
+                certSigner.request({
+                    purpose: 'identification',
+                    payload: {
+                        type: 'text',
+                        content: 'content'
+                    }
+                }).catch((err) => {
+                    expect(err.name).to.be.equal('Rejected')
+                    done()
+                })
+                , done)
         })
 
         it('request:user decline should throw rejected error', (done) => {
