@@ -5,7 +5,7 @@
   "main": "dist/",
   "scripts": {
     "build": "tsc -p .",
-    "postinstall": "npm run build",
+    "prepare": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
