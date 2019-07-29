@@ -1,5 +1,3 @@
-import { link } from 'fs';
-
 const { expect } = require('chai') 
 const { Certificate } = require('thor-devkit')
 const { promiseWrapper } = require('./utils')

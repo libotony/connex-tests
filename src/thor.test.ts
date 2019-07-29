@@ -1,4 +1,3 @@
-import '@vechain/connex'
 const { ensureBlock, ensureStatus, ensureTransaction, ensureTransactionReceipt, ensureAccount, ensureVMOutput, ensureEventCriteria, ensureEventLog, ensureTransferLog } = require('./validator')
 const { expect } = require('chai')
 const { isSemVer, isHexBytes, isAddress, isBytes32 } = require('./types')
