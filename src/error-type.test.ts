@@ -601,23 +601,6 @@ describe('error type and message', () => {
             }
         })
 
-        it('tx-request: delegate handler return non-65 length string should throw', done => {
-            const txSigner = connex.vendor.sign('tx')
-            txSigner.delegate(() => {
-                return Promise.resolve({ signature: '' })
-            })
-
-            promiseWrapper(
-                txSigner.request([]).then(() => {
-                    return done(new Error('Should throw error'))
-                }).catch((err) => {
-                    expect(err.name).to.be.equal('Rejected')
-                    done()
-                })
-            , done)
-            
-        })
-
         it('cert-request:invalid signer should throw', done => {
             const certSigner = connex.vendor.sign('cert')
             try {
