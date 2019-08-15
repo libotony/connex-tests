@@ -6,12 +6,20 @@ const { isAddress, isBytes32, isHexBytes} = require('./types')
 export{}
 describe('connex.vendor', () => {
 
-    it('should own 0xf2e7617c45c42967fde0514b5aa6bba56e3e11dd in user account', () => {
-        expect(connex.vendor.owned('0xf2e7617c45c42967fde0514b5aa6bba56e3e11dd')).to.be.true
+    it('should own 0xf2e7617c45c42967fde0514b5aa6bba56e3e11dd in user account', (done) => {
+        promiseWrapper(
+            connex.vendor.owned('0xf2e7617c45c42967fde0514b5aa6bba56e3e11dd').then(ret => {
+            expect(ret).to.be.true
+            done()
+        }), done)
     })
 
-    it('should not own 0x0000000000000000000000000000000000000000 in user account', () => {
-        expect(connex.vendor.owned('0x0000000000000000000000000000000000000000')).to.be.false
+    it('should not own 0x0000000000000000000000000000000000000000 in user account', (done) => {
+        promiseWrapper(
+            connex.vendor.owned('0x0000000000000000000000000000000000000000').then(ret => {
+                expect(ret).to.be.false
+                done()
+            }), done)
     })
 
     it('acquire singing service should return signing service without error', () => {
